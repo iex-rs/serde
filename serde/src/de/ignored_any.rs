@@ -4,6 +4,8 @@ use crate::de::{
     Deserialize, Deserializer, EnumAccess, Error, MapAccess, SeqAccess, VariantAccess, Visitor,
 };
 
+use iex::iex;
+
 /// An efficient way of discarding data from a deserializer.
 ///
 /// Think of this like `serde_json::Value` in that it can be deserialized from
@@ -118,42 +120,49 @@ impl<'de> Visitor<'de> for IgnoredAny {
     }
 
     #[inline]
+    #[iex]
     fn visit_bool<E>(self, x: bool) -> Result<Self::Value, E> {
         let _ = x;
         Ok(IgnoredAny)
     }
 
     #[inline]
+    #[iex]
     fn visit_i64<E>(self, x: i64) -> Result<Self::Value, E> {
         let _ = x;
         Ok(IgnoredAny)
     }
 
     #[inline]
+    #[iex]
     fn visit_i128<E>(self, x: i128) -> Result<Self::Value, E> {
         let _ = x;
         Ok(IgnoredAny)
     }
 
     #[inline]
+    #[iex]
     fn visit_u64<E>(self, x: u64) -> Result<Self::Value, E> {
         let _ = x;
         Ok(IgnoredAny)
     }
 
     #[inline]
+    #[iex]
     fn visit_u128<E>(self, x: u128) -> Result<Self::Value, E> {
         let _ = x;
         Ok(IgnoredAny)
     }
 
     #[inline]
+    #[iex]
     fn visit_f64<E>(self, x: f64) -> Result<Self::Value, E> {
         let _ = x;
         Ok(IgnoredAny)
     }
 
     #[inline]
+    #[iex]
     fn visit_str<E>(self, s: &str) -> Result<Self::Value, E>
     where
         E: Error,
@@ -163,11 +172,13 @@ impl<'de> Visitor<'de> for IgnoredAny {
     }
 
     #[inline]
+    #[iex]
     fn visit_none<E>(self) -> Result<Self::Value, E> {
         Ok(IgnoredAny)
     }
 
     #[inline]
+    #[iex]
     fn visit_some<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
     where
         D: Deserializer<'de>,
@@ -176,6 +187,7 @@ impl<'de> Visitor<'de> for IgnoredAny {
     }
 
     #[inline]
+    #[iex]
     fn visit_newtype_struct<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
     where
         D: Deserializer<'de>,
@@ -184,33 +196,37 @@ impl<'de> Visitor<'de> for IgnoredAny {
     }
 
     #[inline]
+    #[iex]
     fn visit_unit<E>(self) -> Result<Self::Value, E> {
         Ok(IgnoredAny)
     }
 
     #[inline]
+    #[iex]
     fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
     where
         A: SeqAccess<'de>,
     {
-        while let Some(IgnoredAny) = tri!(seq.next_element()) {
+        while let Some(IgnoredAny) = seq.next_element()? {
             // Gobble
         }
         Ok(IgnoredAny)
     }
 
     #[inline]
+    #[iex]
     fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
     where
         A: MapAccess<'de>,
     {
-        while let Some((IgnoredAny, IgnoredAny)) = tri!(map.next_entry()) {
+        while let Some((IgnoredAny, IgnoredAny)) = map.next_entry()? {
             // Gobble
         }
         Ok(IgnoredAny)
     }
 
     #[inline]
+    #[iex]
     fn visit_bytes<E>(self, bytes: &[u8]) -> Result<Self::Value, E>
     where
         E: Error,
@@ -219,16 +235,18 @@ impl<'de> Visitor<'de> for IgnoredAny {
         Ok(IgnoredAny)
     }
 
+    #[iex]
     fn visit_enum<A>(self, data: A) -> Result<Self::Value, A::Error>
     where
         A: EnumAccess<'de>,
     {
-        tri!(data.variant::<IgnoredAny>()).1.newtype_variant()
+        data.variant::<IgnoredAny>()?.1.newtype_variant()
     }
 }
 
 impl<'de> Deserialize<'de> for IgnoredAny {
     #[inline]
+    #[iex]
     fn deserialize<D>(deserializer: D) -> Result<IgnoredAny, D::Error>
     where
         D: Deserializer<'de>,

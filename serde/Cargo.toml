@@ -16,6 +16,7 @@ rust-version = "1.31"
 
 [dependencies]
 serde_derive = { version = "1", optional = true, path = "../serde_derive" }
+iex = { path = "/home/purplesyringa/iex" }
 
 [dev-dependencies]
 serde_derive = { version = "1", path = "../serde_derive" }

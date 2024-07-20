@@ -1,3 +1,5 @@
+use iex::{iex, Outcome};
+
 use crate::lib::*;
 
 use crate::de::value::{BorrowedBytesDeserializer, BytesDeserializer};
@@ -20,6 +22,7 @@ pub use crate::seed::InPlaceSeed;
 
 /// If the missing field is of type `Option<T>` then treat is as `None`,
 /// otherwise it is an error.
+#[iex]
 pub fn missing_field<'de, V, E>(field: &'static str) -> Result<V, E>
 where
     V: Deserialize<'de>,
@@ -33,6 +36,7 @@ where
     {
         type Error = E;
 
+        #[iex]
         fn deserialize_any<V>(self, _visitor: V) -> Result<V::Value, E>
         where
             V: Visitor<'de>,
@@ -40,11 +44,12 @@ where
             Err(Error::missing_field(self.0))
         }
 
+        #[iex]
         fn deserialize_option<V>(self, visitor: V) -> Result<V::Value, E>
         where
             V: Visitor<'de>,
         {
-            visitor.visit_none()
+            visitor.visit_none::<E>()
         }
 
         forward_to_deserialize_any! {
@@ -54,11 +59,12 @@ where
         }
     }
 
-    let deserializer = MissingFieldDeserializer(field, PhantomData);
-    Deserialize::deserialize(deserializer)
+    let deserializer = MissingFieldDeserializer::<E>(field, PhantomData);
+    V::deserialize(deserializer)
 }
 
 #[cfg(any(feature = "std", feature = "alloc"))]
+#[iex]
 pub fn borrow_cow_str<'de: 'a, 'a, D, R>(deserializer: D) -> Result<R, D::Error>
 where
     D: Deserializer<'de>,
@@ -73,6 +79,7 @@ where
             formatter.write_str("a string")
         }
 
+        #[iex]
         fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
         where
             E: Error,
@@ -80,6 +87,7 @@ where
             Ok(Cow::Owned(v.to_owned()))
         }
 
+        #[iex]
         fn visit_borrowed_str<E>(self, v: &'a str) -> Result<Self::Value, E>
         where
             E: Error,
@@ -87,6 +95,7 @@ where
             Ok(Cow::Borrowed(v))
         }
 
+        #[iex]
         fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
         where
             E: Error,
@@ -94,6 +103,7 @@ where
             Ok(Cow::Owned(v))
         }
 
+        #[iex]
         fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E>
         where
             E: Error,
@@ -104,6 +114,7 @@ where
             }
         }
 
+        #[iex]
         fn visit_borrowed_bytes<E>(self, v: &'a [u8]) -> Result<Self::Value, E>
         where
             E: Error,
@@ -114,6 +125,7 @@ where
             }
         }
 
+        #[iex]
         fn visit_byte_buf<E>(self, v: Vec<u8>) -> Result<Self::Value, E>
         where
             E: Error,
@@ -128,10 +140,11 @@ where
         }
     }
 
-    deserializer.deserialize_str(CowStrVisitor).map(From::from)
+    Ok(deserializer.deserialize_str(CowStrVisitor)?.into())
 }
 
 #[cfg(any(feature = "std", feature = "alloc"))]
+#[iex]
 pub fn borrow_cow_bytes<'de: 'a, 'a, D, R>(deserializer: D) -> Result<R, D::Error>
 where
     D: Deserializer<'de>,
@@ -146,6 +159,7 @@ where
             formatter.write_str("a byte array")
         }
 
+        #[iex]
         fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
         where
             E: Error,
@@ -153,6 +167,7 @@ where
             Ok(Cow::Owned(v.as_bytes().to_vec()))
         }
 
+        #[iex]
         fn visit_borrowed_str<E>(self, v: &'a str) -> Result<Self::Value, E>
         where
             E: Error,
@@ -160,6 +175,7 @@ where
             Ok(Cow::Borrowed(v.as_bytes()))
         }
 
+        #[iex]
         fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
         where
             E: Error,
@@ -167,6 +183,7 @@ where
             Ok(Cow::Owned(v.into_bytes()))
         }
 
+        #[iex]
         fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E>
         where
             E: Error,
@@ -174,6 +191,7 @@ where
             Ok(Cow::Owned(v.to_vec()))
         }
 
+        #[iex]
         fn visit_borrowed_bytes<E>(self, v: &'a [u8]) -> Result<Self::Value, E>
         where
             E: Error,
@@ -181,6 +199,7 @@ where
             Ok(Cow::Borrowed(v))
         }
 
+        #[iex]
         fn visit_byte_buf<E>(self, v: Vec<u8>) -> Result<Self::Value, E>
         where
             E: Error,
@@ -189,9 +208,7 @@ where
         }
     }
 
-    deserializer
-        .deserialize_bytes(CowBytesVisitor)
-        .map(From::from)
+    Ok(deserializer.deserialize_bytes(CowBytesVisitor)?.into())
 }
 
 #[cfg(any(feature = "std", feature = "alloc"))]
@@ -205,6 +222,8 @@ mod content {
     //
     // This issue is tracking making some of this stuff public:
     // https://github.com/serde-rs/serde/issues/741
+
+    use iex::iex;
 
     use crate::lib::*;
 
@@ -291,6 +310,7 @@ mod content {
     }
 
     impl<'de> Deserialize<'de> for Content<'de> {
+        #[iex]
         fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
         where
             D: Deserializer<'de>,
@@ -332,6 +352,7 @@ mod content {
             fmt.write_str("any value")
         }
 
+        #[iex]
         fn visit_bool<F>(self, value: bool) -> Result<Self::Value, F>
         where
             F: de::Error,
@@ -339,6 +360,7 @@ mod content {
             Ok(Content::Bool(value))
         }
 
+        #[iex]
         fn visit_i8<F>(self, value: i8) -> Result<Self::Value, F>
         where
             F: de::Error,
@@ -346,6 +368,7 @@ mod content {
             Ok(Content::I8(value))
         }
 
+        #[iex]
         fn visit_i16<F>(self, value: i16) -> Result<Self::Value, F>
         where
             F: de::Error,
@@ -353,6 +376,7 @@ mod content {
             Ok(Content::I16(value))
         }
 
+        #[iex]
         fn visit_i32<F>(self, value: i32) -> Result<Self::Value, F>
         where
             F: de::Error,
@@ -360,6 +384,7 @@ mod content {
             Ok(Content::I32(value))
         }
 
+        #[iex]
         fn visit_i64<F>(self, value: i64) -> Result<Self::Value, F>
         where
             F: de::Error,
@@ -367,6 +392,7 @@ mod content {
             Ok(Content::I64(value))
         }
 
+        #[iex]
         fn visit_u8<F>(self, value: u8) -> Result<Self::Value, F>
         where
             F: de::Error,
@@ -374,6 +400,7 @@ mod content {
             Ok(Content::U8(value))
         }
 
+        #[iex]
         fn visit_u16<F>(self, value: u16) -> Result<Self::Value, F>
         where
             F: de::Error,
@@ -381,6 +408,7 @@ mod content {
             Ok(Content::U16(value))
         }
 
+        #[iex]
         fn visit_u32<F>(self, value: u32) -> Result<Self::Value, F>
         where
             F: de::Error,
@@ -388,6 +416,7 @@ mod content {
             Ok(Content::U32(value))
         }
 
+        #[iex]
         fn visit_u64<F>(self, value: u64) -> Result<Self::Value, F>
         where
             F: de::Error,
@@ -395,6 +424,7 @@ mod content {
             Ok(Content::U64(value))
         }
 
+        #[iex]
         fn visit_f32<F>(self, value: f32) -> Result<Self::Value, F>
         where
             F: de::Error,
@@ -402,6 +432,7 @@ mod content {
             Ok(Content::F32(value))
         }
 
+        #[iex]
         fn visit_f64<F>(self, value: f64) -> Result<Self::Value, F>
         where
             F: de::Error,
@@ -409,6 +440,7 @@ mod content {
             Ok(Content::F64(value))
         }
 
+        #[iex]
         fn visit_char<F>(self, value: char) -> Result<Self::Value, F>
         where
             F: de::Error,
@@ -416,6 +448,7 @@ mod content {
             Ok(Content::Char(value))
         }
 
+        #[iex]
         fn visit_str<F>(self, value: &str) -> Result<Self::Value, F>
         where
             F: de::Error,
@@ -423,6 +456,7 @@ mod content {
             Ok(Content::String(value.into()))
         }
 
+        #[iex]
         fn visit_borrowed_str<F>(self, value: &'de str) -> Result<Self::Value, F>
         where
             F: de::Error,
@@ -430,6 +464,7 @@ mod content {
             Ok(Content::Str(value))
         }
 
+        #[iex]
         fn visit_string<F>(self, value: String) -> Result<Self::Value, F>
         where
             F: de::Error,
@@ -437,6 +472,7 @@ mod content {
             Ok(Content::String(value))
         }
 
+        #[iex]
         fn visit_bytes<F>(self, value: &[u8]) -> Result<Self::Value, F>
         where
             F: de::Error,
@@ -444,6 +480,7 @@ mod content {
             Ok(Content::ByteBuf(value.into()))
         }
 
+        #[iex]
         fn visit_borrowed_bytes<F>(self, value: &'de [u8]) -> Result<Self::Value, F>
         where
             F: de::Error,
@@ -451,6 +488,7 @@ mod content {
             Ok(Content::Bytes(value))
         }
 
+        #[iex]
         fn visit_byte_buf<F>(self, value: Vec<u8>) -> Result<Self::Value, F>
         where
             F: de::Error,
@@ -458,6 +496,7 @@ mod content {
             Ok(Content::ByteBuf(value))
         }
 
+        #[iex]
         fn visit_unit<F>(self) -> Result<Self::Value, F>
         where
             F: de::Error,
@@ -465,6 +504,7 @@ mod content {
             Ok(Content::Unit)
         }
 
+        #[iex]
         fn visit_none<F>(self) -> Result<Self::Value, F>
         where
             F: de::Error,
@@ -472,32 +512,38 @@ mod content {
             Ok(Content::None)
         }
 
+        #[iex]
         fn visit_some<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
         where
             D: Deserializer<'de>,
         {
-            Deserialize::deserialize(deserializer).map(|v| Content::Some(Box::new(v)))
+            Ok(Content::Some(Box::new(Content::deserialize(deserializer)?)))
         }
 
+        #[iex]
         fn visit_newtype_struct<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
         where
             D: Deserializer<'de>,
         {
-            Deserialize::deserialize(deserializer).map(|v| Content::Newtype(Box::new(v)))
+            Ok(Content::Newtype(Box::new(Content::deserialize(
+                deserializer,
+            )?)))
         }
 
+        #[iex]
         fn visit_seq<V>(self, mut visitor: V) -> Result<Self::Value, V::Error>
         where
             V: SeqAccess<'de>,
         {
             let mut vec =
                 Vec::<Content>::with_capacity(size_hint::cautious::<Content>(visitor.size_hint()));
-            while let Some(e) = tri!(visitor.next_element()) {
+            while let Some(e) = visitor.next_element()? {
                 vec.push(e);
             }
             Ok(Content::Seq(vec))
         }
 
+        #[iex]
         fn visit_map<V>(self, mut visitor: V) -> Result<Self::Value, V::Error>
         where
             V: MapAccess<'de>,
@@ -506,12 +552,13 @@ mod content {
                 Vec::<(Content, Content)>::with_capacity(
                     size_hint::cautious::<(Content, Content)>(visitor.size_hint()),
                 );
-            while let Some(kv) = tri!(visitor.next_entry()) {
+            while let Some(kv) = visitor.next_entry()? {
                 vec.push(kv);
             }
             Ok(Content::Map(vec))
         }
 
+        #[iex]
         fn visit_enum<V>(self, _visitor: V) -> Result<Self::Value, V::Error>
         where
             V: EnumAccess<'de>,
@@ -549,6 +596,7 @@ mod content {
     impl<'de> DeserializeSeed<'de> for TagOrContentVisitor<'de> {
         type Value = TagOrContent<'de>;
 
+        #[iex]
         fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
         where
             D: Deserializer<'de>,
@@ -566,114 +614,127 @@ mod content {
             write!(fmt, "a type tag `{}` or any other value", self.name)
         }
 
+        #[iex]
         fn visit_bool<F>(self, value: bool) -> Result<Self::Value, F>
         where
             F: de::Error,
         {
-            ContentVisitor::new()
-                .visit_bool(value)
-                .map(TagOrContent::Content)
+            Ok(TagOrContent::Content(
+                ContentVisitor::new().visit_bool::<F>(value)?,
+            ))
         }
 
+        #[iex]
         fn visit_i8<F>(self, value: i8) -> Result<Self::Value, F>
         where
             F: de::Error,
         {
-            ContentVisitor::new()
-                .visit_i8(value)
-                .map(TagOrContent::Content)
+            Ok(TagOrContent::Content(
+                ContentVisitor::new().visit_i8::<F>(value)?,
+            ))
         }
 
+        #[iex]
         fn visit_i16<F>(self, value: i16) -> Result<Self::Value, F>
         where
             F: de::Error,
         {
-            ContentVisitor::new()
-                .visit_i16(value)
-                .map(TagOrContent::Content)
+            Ok(TagOrContent::Content(
+                ContentVisitor::new().visit_i16::<F>(value)?,
+            ))
         }
 
+        #[iex]
         fn visit_i32<F>(self, value: i32) -> Result<Self::Value, F>
         where
             F: de::Error,
         {
-            ContentVisitor::new()
-                .visit_i32(value)
-                .map(TagOrContent::Content)
+            Ok(TagOrContent::Content(
+                ContentVisitor::new().visit_i32::<F>(value)?,
+            ))
         }
 
+        #[iex]
         fn visit_i64<F>(self, value: i64) -> Result<Self::Value, F>
         where
             F: de::Error,
         {
-            ContentVisitor::new()
-                .visit_i64(value)
-                .map(TagOrContent::Content)
+            Ok(TagOrContent::Content(
+                ContentVisitor::new().visit_i64::<F>(value)?,
+            ))
         }
 
+        #[iex]
         fn visit_u8<F>(self, value: u8) -> Result<Self::Value, F>
         where
             F: de::Error,
         {
-            ContentVisitor::new()
-                .visit_u8(value)
-                .map(TagOrContent::Content)
+            Ok(TagOrContent::Content(
+                ContentVisitor::new().visit_u8::<F>(value)?,
+            ))
         }
 
+        #[iex]
         fn visit_u16<F>(self, value: u16) -> Result<Self::Value, F>
         where
             F: de::Error,
         {
-            ContentVisitor::new()
-                .visit_u16(value)
-                .map(TagOrContent::Content)
+            Ok(TagOrContent::Content(
+                ContentVisitor::new().visit_u16::<F>(value)?,
+            ))
         }
 
+        #[iex]
         fn visit_u32<F>(self, value: u32) -> Result<Self::Value, F>
         where
             F: de::Error,
         {
-            ContentVisitor::new()
-                .visit_u32(value)
-                .map(TagOrContent::Content)
+            Ok(TagOrContent::Content(
+                ContentVisitor::new().visit_u32::<F>(value)?,
+            ))
         }
 
+        #[iex]
         fn visit_u64<F>(self, value: u64) -> Result<Self::Value, F>
         where
             F: de::Error,
         {
-            ContentVisitor::new()
-                .visit_u64(value)
-                .map(TagOrContent::Content)
+            Ok(TagOrContent::Content(
+                ContentVisitor::new().visit_u64::<F>(value)?,
+            ))
         }
 
+        #[iex]
         fn visit_f32<F>(self, value: f32) -> Result<Self::Value, F>
         where
             F: de::Error,
         {
-            ContentVisitor::new()
-                .visit_f32(value)
-                .map(TagOrContent::Content)
+            Ok(TagOrContent::Content(
+                ContentVisitor::new().visit_f32::<F>(value)?,
+            ))
         }
 
+        #[iex]
         fn visit_f64<F>(self, value: f64) -> Result<Self::Value, F>
         where
             F: de::Error,
         {
-            ContentVisitor::new()
-                .visit_f64(value)
-                .map(TagOrContent::Content)
+            Ok(TagOrContent::Content(
+                ContentVisitor::new().visit_f64::<F>(value)?,
+            ))
         }
 
+        #[iex]
         fn visit_char<F>(self, value: char) -> Result<Self::Value, F>
         where
             F: de::Error,
         {
-            ContentVisitor::new()
-                .visit_char(value)
-                .map(TagOrContent::Content)
+            Ok(TagOrContent::Content(
+                ContentVisitor::new().visit_char::<F>(value)?,
+            ))
         }
 
+        #[iex]
         fn visit_str<F>(self, value: &str) -> Result<Self::Value, F>
         where
             F: de::Error,
@@ -681,12 +742,13 @@ mod content {
             if value == self.name {
                 Ok(TagOrContent::Tag)
             } else {
-                ContentVisitor::new()
-                    .visit_str(value)
-                    .map(TagOrContent::Content)
+                Ok(TagOrContent::Content(
+                    ContentVisitor::new().visit_str::<F>(value)?,
+                ))
             }
         }
 
+        #[iex]
         fn visit_borrowed_str<F>(self, value: &'de str) -> Result<Self::Value, F>
         where
             F: de::Error,
@@ -694,12 +756,13 @@ mod content {
             if value == self.name {
                 Ok(TagOrContent::Tag)
             } else {
-                ContentVisitor::new()
-                    .visit_borrowed_str(value)
-                    .map(TagOrContent::Content)
+                Ok(TagOrContent::Content(
+                    ContentVisitor::new().visit_borrowed_str::<F>(value)?,
+                ))
             }
         }
 
+        #[iex]
         fn visit_string<F>(self, value: String) -> Result<Self::Value, F>
         where
             F: de::Error,
@@ -707,12 +770,13 @@ mod content {
             if value == self.name {
                 Ok(TagOrContent::Tag)
             } else {
-                ContentVisitor::new()
-                    .visit_string(value)
-                    .map(TagOrContent::Content)
+                Ok(TagOrContent::Content(
+                    ContentVisitor::new().visit_string::<F>(value)?,
+                ))
             }
         }
 
+        #[iex]
         fn visit_bytes<F>(self, value: &[u8]) -> Result<Self::Value, F>
         where
             F: de::Error,
@@ -720,12 +784,13 @@ mod content {
             if value == self.name.as_bytes() {
                 Ok(TagOrContent::Tag)
             } else {
-                ContentVisitor::new()
-                    .visit_bytes(value)
-                    .map(TagOrContent::Content)
+                Ok(TagOrContent::Content(
+                    ContentVisitor::new().visit_bytes::<F>(value)?,
+                ))
             }
         }
 
+        #[iex]
         fn visit_borrowed_bytes<F>(self, value: &'de [u8]) -> Result<Self::Value, F>
         where
             F: de::Error,
@@ -733,12 +798,13 @@ mod content {
             if value == self.name.as_bytes() {
                 Ok(TagOrContent::Tag)
             } else {
-                ContentVisitor::new()
-                    .visit_borrowed_bytes(value)
-                    .map(TagOrContent::Content)
+                Ok(TagOrContent::Content(
+                    ContentVisitor::new().visit_borrowed_bytes::<F>(value)?,
+                ))
             }
         }
 
+        #[iex]
         fn visit_byte_buf<F>(self, value: Vec<u8>) -> Result<Self::Value, F>
         where
             F: de::Error,
@@ -746,73 +812,80 @@ mod content {
             if value == self.name.as_bytes() {
                 Ok(TagOrContent::Tag)
             } else {
-                ContentVisitor::new()
-                    .visit_byte_buf(value)
-                    .map(TagOrContent::Content)
+                Ok(TagOrContent::Content(
+                    ContentVisitor::new().visit_byte_buf::<F>(value)?,
+                ))
             }
         }
 
+        #[iex]
         fn visit_unit<F>(self) -> Result<Self::Value, F>
         where
             F: de::Error,
         {
-            ContentVisitor::new()
-                .visit_unit()
-                .map(TagOrContent::Content)
+            Ok(TagOrContent::Content(
+                ContentVisitor::new().visit_unit::<F>()?,
+            ))
         }
 
+        #[iex]
         fn visit_none<F>(self) -> Result<Self::Value, F>
         where
             F: de::Error,
         {
-            ContentVisitor::new()
-                .visit_none()
-                .map(TagOrContent::Content)
+            Ok(TagOrContent::Content(
+                ContentVisitor::new().visit_none::<F>()?,
+            ))
         }
 
+        #[iex]
         fn visit_some<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
         where
             D: Deserializer<'de>,
         {
-            ContentVisitor::new()
-                .visit_some(deserializer)
-                .map(TagOrContent::Content)
+            Ok(TagOrContent::Content(
+                ContentVisitor::new().visit_some(deserializer)?,
+            ))
         }
 
+        #[iex]
         fn visit_newtype_struct<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
         where
             D: Deserializer<'de>,
         {
-            ContentVisitor::new()
-                .visit_newtype_struct(deserializer)
-                .map(TagOrContent::Content)
+            Ok(TagOrContent::Content(
+                ContentVisitor::new().visit_newtype_struct(deserializer)?,
+            ))
         }
 
+        #[iex]
         fn visit_seq<V>(self, visitor: V) -> Result<Self::Value, V::Error>
         where
             V: SeqAccess<'de>,
         {
-            ContentVisitor::new()
-                .visit_seq(visitor)
-                .map(TagOrContent::Content)
+            Ok(TagOrContent::Content(
+                ContentVisitor::new().visit_seq(visitor)?,
+            ))
         }
 
+        #[iex]
         fn visit_map<V>(self, visitor: V) -> Result<Self::Value, V::Error>
         where
             V: MapAccess<'de>,
         {
-            ContentVisitor::new()
-                .visit_map(visitor)
-                .map(TagOrContent::Content)
+            Ok(TagOrContent::Content(
+                ContentVisitor::new().visit_map(visitor)?,
+            ))
         }
 
+        #[iex]
         fn visit_enum<V>(self, visitor: V) -> Result<Self::Value, V::Error>
         where
             V: EnumAccess<'de>,
         {
-            ContentVisitor::new()
-                .visit_enum(visitor)
-                .map(TagOrContent::Content)
+            Ok(TagOrContent::Content(
+                ContentVisitor::new().visit_enum(visitor)?,
+            ))
         }
     }
 
@@ -850,20 +923,21 @@ mod content {
             fmt.write_str(self.expecting)
         }
 
+        #[iex]
         fn visit_seq<S>(self, mut seq: S) -> Result<Self::Value, S::Error>
         where
             S: SeqAccess<'de>,
         {
-            let tag = match tri!(seq.next_element()) {
+            let tag = match seq.next_element()? {
                 Some(tag) => tag,
                 None => {
                     return Err(de::Error::missing_field(self.tag_name));
                 }
             };
             let rest = de::value::SeqAccessDeserializer::new(seq);
-            Ok((tag, tri!(Content::deserialize(rest))))
+            Ok((tag, Content::deserialize(rest)?))
         }
-
+        #[iex]
         fn visit_map<M>(self, mut map: M) -> Result<Self::Value, M::Error>
         where
             M: MapAccess<'de>,
@@ -873,16 +947,16 @@ mod content {
                 Content,
                 Content,
             )>(map.size_hint()));
-            while let Some(k) = tri!(map.next_key_seed(TagOrContentVisitor::new(self.tag_name))) {
+            while let Some(k) = map.next_key_seed(TagOrContentVisitor::new(self.tag_name))? {
                 match k {
                     TagOrContent::Tag => {
                         if tag.is_some() {
                             return Err(de::Error::duplicate_field(self.tag_name));
                         }
-                        tag = Some(tri!(map.next_value()));
+                        tag = Some(map.next_value()?);
                     }
                     TagOrContent::Content(k) => {
-                        let v = tri!(map.next_value());
+                        let v = map.next_value()?;
                         vec.push((k, v));
                     }
                 }
@@ -911,6 +985,7 @@ mod content {
     impl<'de> DeserializeSeed<'de> for TagOrContentFieldVisitor {
         type Value = TagOrContentField;
 
+        #[iex]
         fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
         where
             D: Deserializer<'de>,
@@ -926,6 +1001,7 @@ mod content {
             write!(formatter, "{:?} or {:?}", self.tag, self.content)
         }
 
+        #[iex]
         fn visit_u64<E>(self, field_index: u64) -> Result<Self::Value, E>
         where
             E: de::Error,
@@ -940,6 +1016,7 @@ mod content {
             }
         }
 
+        #[iex]
         fn visit_str<E>(self, field: &str) -> Result<Self::Value, E>
         where
             E: de::Error,
@@ -953,6 +1030,7 @@ mod content {
             }
         }
 
+        #[iex]
         fn visit_bytes<E>(self, field: &[u8]) -> Result<Self::Value, E>
         where
             E: de::Error,
@@ -986,6 +1064,7 @@ mod content {
     impl<'de> DeserializeSeed<'de> for TagContentOtherFieldVisitor {
         type Value = TagContentOtherField;
 
+        #[iex]
         fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
         where
             D: Deserializer<'de>,
@@ -1005,6 +1084,7 @@ mod content {
             )
         }
 
+        #[iex]
         fn visit_u64<E>(self, field_index: u64) -> Result<Self::Value, E>
         where
             E: de::Error,
@@ -1016,13 +1096,15 @@ mod content {
             }
         }
 
+        #[iex]
         fn visit_str<E>(self, field: &str) -> Result<Self::Value, E>
         where
             E: de::Error,
         {
-            self.visit_bytes(field.as_bytes())
+            self.visit_bytes::<E>(field.as_bytes())
         }
 
+        #[iex]
         fn visit_bytes<E>(self, field: &[u8]) -> Result<Self::Value, E>
         where
             E: de::Error,
@@ -1052,55 +1134,59 @@ mod content {
             de::Error::invalid_type(self.content.unexpected(), exp)
         }
 
+        #[iex]
         fn deserialize_integer<V>(self, visitor: V) -> Result<V::Value, E>
         where
             V: Visitor<'de>,
         {
             match self.content {
-                Content::U8(v) => visitor.visit_u8(v),
-                Content::U16(v) => visitor.visit_u16(v),
-                Content::U32(v) => visitor.visit_u32(v),
-                Content::U64(v) => visitor.visit_u64(v),
-                Content::I8(v) => visitor.visit_i8(v),
-                Content::I16(v) => visitor.visit_i16(v),
-                Content::I32(v) => visitor.visit_i32(v),
-                Content::I64(v) => visitor.visit_i64(v),
+                Content::U8(v) => Ok(visitor.visit_u8::<E>(v)?),
+                Content::U16(v) => Ok(visitor.visit_u16::<E>(v)?),
+                Content::U32(v) => Ok(visitor.visit_u32::<E>(v)?),
+                Content::U64(v) => Ok(visitor.visit_u64::<E>(v)?),
+                Content::I8(v) => Ok(visitor.visit_i8::<E>(v)?),
+                Content::I16(v) => Ok(visitor.visit_i16::<E>(v)?),
+                Content::I32(v) => Ok(visitor.visit_i32::<E>(v)?),
+                Content::I64(v) => Ok(visitor.visit_i64::<E>(v)?),
                 _ => Err(self.invalid_type(&visitor)),
             }
         }
 
+        #[iex]
         fn deserialize_float<V>(self, visitor: V) -> Result<V::Value, E>
         where
             V: Visitor<'de>,
         {
             match self.content {
-                Content::F32(v) => visitor.visit_f32(v),
-                Content::F64(v) => visitor.visit_f64(v),
-                Content::U8(v) => visitor.visit_u8(v),
-                Content::U16(v) => visitor.visit_u16(v),
-                Content::U32(v) => visitor.visit_u32(v),
-                Content::U64(v) => visitor.visit_u64(v),
-                Content::I8(v) => visitor.visit_i8(v),
-                Content::I16(v) => visitor.visit_i16(v),
-                Content::I32(v) => visitor.visit_i32(v),
-                Content::I64(v) => visitor.visit_i64(v),
+                Content::F32(v) => Ok(visitor.visit_f32::<E>(v)?),
+                Content::F64(v) => Ok(visitor.visit_f64::<E>(v)?),
+                Content::U8(v) => Ok(visitor.visit_u8::<E>(v)?),
+                Content::U16(v) => Ok(visitor.visit_u16::<E>(v)?),
+                Content::U32(v) => Ok(visitor.visit_u32::<E>(v)?),
+                Content::U64(v) => Ok(visitor.visit_u64::<E>(v)?),
+                Content::I8(v) => Ok(visitor.visit_i8::<E>(v)?),
+                Content::I16(v) => Ok(visitor.visit_i16::<E>(v)?),
+                Content::I32(v) => Ok(visitor.visit_i32::<E>(v)?),
+                Content::I64(v) => Ok(visitor.visit_i64::<E>(v)?),
                 _ => Err(self.invalid_type(&visitor)),
             }
         }
     }
 
+    #[iex]
     fn visit_content_seq<'de, V, E>(content: Vec<Content<'de>>, visitor: V) -> Result<V::Value, E>
     where
         V: Visitor<'de>,
         E: de::Error,
     {
-        let seq = content.into_iter().map(ContentDeserializer::new);
+        let seq = content.into_iter().map(ContentDeserializer::<E>::new);
         let mut seq_visitor = SeqDeserializer::new(seq);
-        let value = tri!(visitor.visit_seq(&mut seq_visitor));
-        tri!(seq_visitor.end());
+        let value = visitor.visit_seq(&mut seq_visitor)?;
+        seq_visitor.end()?;
         Ok(value)
     }
 
+    #[iex]
     fn visit_content_map<'de, V, E>(
         content: Vec<(Content<'de>, Content<'de>)>,
         visitor: V,
@@ -1109,12 +1195,15 @@ mod content {
         V: Visitor<'de>,
         E: de::Error,
     {
-        let map = content
-            .into_iter()
-            .map(|(k, v)| (ContentDeserializer::new(k), ContentDeserializer::new(v)));
+        let map = content.into_iter().map(|(k, v)| {
+            (
+                ContentDeserializer::<E>::new(k),
+                ContentDeserializer::<E>::new(v),
+            )
+        });
         let mut map_visitor = MapDeserializer::new(map);
-        let value = tri!(visitor.visit_map(&mut map_visitor));
-        tri!(map_visitor.end());
+        let value = visitor.visit_map(&mut map_visitor)?;
+        map_visitor.end()?;
         Ok(value)
     }
 
@@ -1126,46 +1215,55 @@ mod content {
     {
         type Error = E;
 
+        #[iex]
         fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: Visitor<'de>,
         {
             match self.content {
-                Content::Bool(v) => visitor.visit_bool(v),
-                Content::U8(v) => visitor.visit_u8(v),
-                Content::U16(v) => visitor.visit_u16(v),
-                Content::U32(v) => visitor.visit_u32(v),
-                Content::U64(v) => visitor.visit_u64(v),
-                Content::I8(v) => visitor.visit_i8(v),
-                Content::I16(v) => visitor.visit_i16(v),
-                Content::I32(v) => visitor.visit_i32(v),
-                Content::I64(v) => visitor.visit_i64(v),
-                Content::F32(v) => visitor.visit_f32(v),
-                Content::F64(v) => visitor.visit_f64(v),
-                Content::Char(v) => visitor.visit_char(v),
-                Content::String(v) => visitor.visit_string(v),
-                Content::Str(v) => visitor.visit_borrowed_str(v),
-                Content::ByteBuf(v) => visitor.visit_byte_buf(v),
-                Content::Bytes(v) => visitor.visit_borrowed_bytes(v),
-                Content::Unit => visitor.visit_unit(),
-                Content::None => visitor.visit_none(),
-                Content::Some(v) => visitor.visit_some(ContentDeserializer::new(*v)),
-                Content::Newtype(v) => visitor.visit_newtype_struct(ContentDeserializer::new(*v)),
-                Content::Seq(v) => visit_content_seq(v, visitor),
-                Content::Map(v) => visit_content_map(v, visitor),
+                Content::Bool(v) => Ok(visitor.visit_bool::<Self::Error>(v)?),
+                Content::U8(v) => Ok(visitor.visit_u8::<Self::Error>(v)?),
+                Content::U16(v) => Ok(visitor.visit_u16::<Self::Error>(v)?),
+                Content::U32(v) => Ok(visitor.visit_u32::<Self::Error>(v)?),
+                Content::U64(v) => Ok(visitor.visit_u64::<Self::Error>(v)?),
+                Content::I8(v) => Ok(visitor.visit_i8::<Self::Error>(v)?),
+                Content::I16(v) => Ok(visitor.visit_i16::<Self::Error>(v)?),
+                Content::I32(v) => Ok(visitor.visit_i32::<Self::Error>(v)?),
+                Content::I64(v) => Ok(visitor.visit_i64::<Self::Error>(v)?),
+                Content::F32(v) => Ok(visitor.visit_f32::<Self::Error>(v)?),
+                Content::F64(v) => Ok(visitor.visit_f64::<Self::Error>(v)?),
+                Content::Char(v) => Ok(visitor.visit_char::<Self::Error>(v)?),
+                Content::String(v) => Ok(visitor.visit_string::<Self::Error>(v)?),
+                Content::Str(v) => Ok(visitor.visit_borrowed_str::<Self::Error>(v)?),
+                Content::ByteBuf(v) => Ok(visitor.visit_byte_buf::<Self::Error>(v)?),
+                Content::Bytes(v) => Ok(visitor.visit_borrowed_bytes::<Self::Error>(v)?),
+                Content::Unit => Ok(visitor.visit_unit::<Self::Error>()?),
+                Content::None => Ok(visitor.visit_none::<Self::Error>()?),
+                Content::Some(v) => {
+                    Ok(visitor.visit_some(ContentDeserializer::<Self::Error>::new(*v))?)
+                }
+                Content::Newtype(v) => Ok(visitor.visit_newtype_struct(ContentDeserializer::<
+                    Self::Error,
+                >::new(
+                    *v
+                ))?),
+                Content::Seq(v) => Ok(visit_content_seq::<_, Self::Error>(v, visitor)?),
+                Content::Map(v) => Ok(visit_content_map::<_, Self::Error>(v, visitor)?),
             }
         }
 
+        #[iex]
         fn deserialize_bool<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: Visitor<'de>,
         {
             match self.content {
-                Content::Bool(v) => visitor.visit_bool(v),
+                Content::Bool(v) => Ok(visitor.visit_bool::<Self::Error>(v)?),
                 _ => Err(self.invalid_type(&visitor)),
             }
         }
 
+        #[iex]
         fn deserialize_i8<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: Visitor<'de>,
@@ -1173,6 +1271,7 @@ mod content {
             self.deserialize_integer(visitor)
         }
 
+        #[iex]
         fn deserialize_i16<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: Visitor<'de>,
@@ -1180,6 +1279,7 @@ mod content {
             self.deserialize_integer(visitor)
         }
 
+        #[iex]
         fn deserialize_i32<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: Visitor<'de>,
@@ -1187,6 +1287,7 @@ mod content {
             self.deserialize_integer(visitor)
         }
 
+        #[iex]
         fn deserialize_i64<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: Visitor<'de>,
@@ -1194,6 +1295,7 @@ mod content {
             self.deserialize_integer(visitor)
         }
 
+        #[iex]
         fn deserialize_u8<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: Visitor<'de>,
@@ -1201,6 +1303,7 @@ mod content {
             self.deserialize_integer(visitor)
         }
 
+        #[iex]
         fn deserialize_u16<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: Visitor<'de>,
@@ -1208,6 +1311,7 @@ mod content {
             self.deserialize_integer(visitor)
         }
 
+        #[iex]
         fn deserialize_u32<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: Visitor<'de>,
@@ -1215,6 +1319,7 @@ mod content {
             self.deserialize_integer(visitor)
         }
 
+        #[iex]
         fn deserialize_u64<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: Visitor<'de>,
@@ -1222,6 +1327,7 @@ mod content {
             self.deserialize_integer(visitor)
         }
 
+        #[iex]
         fn deserialize_f32<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: Visitor<'de>,
@@ -1229,6 +1335,7 @@ mod content {
             self.deserialize_float(visitor)
         }
 
+        #[iex]
         fn deserialize_f64<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: Visitor<'de>,
@@ -1236,18 +1343,20 @@ mod content {
             self.deserialize_float(visitor)
         }
 
+        #[iex]
         fn deserialize_char<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: Visitor<'de>,
         {
             match self.content {
-                Content::Char(v) => visitor.visit_char(v),
-                Content::String(v) => visitor.visit_string(v),
-                Content::Str(v) => visitor.visit_borrowed_str(v),
+                Content::Char(v) => Ok(visitor.visit_char::<Self::Error>(v)?),
+                Content::String(v) => Ok(visitor.visit_string::<Self::Error>(v)?),
+                Content::Str(v) => Ok(visitor.visit_borrowed_str::<Self::Error>(v)?),
                 _ => Err(self.invalid_type(&visitor)),
             }
         }
 
+        #[iex]
         fn deserialize_str<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: Visitor<'de>,
@@ -1255,19 +1364,21 @@ mod content {
             self.deserialize_string(visitor)
         }
 
+        #[iex]
         fn deserialize_string<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: Visitor<'de>,
         {
             match self.content {
-                Content::String(v) => visitor.visit_string(v),
-                Content::Str(v) => visitor.visit_borrowed_str(v),
-                Content::ByteBuf(v) => visitor.visit_byte_buf(v),
-                Content::Bytes(v) => visitor.visit_borrowed_bytes(v),
+                Content::String(v) => Ok(visitor.visit_string::<Self::Error>(v)?),
+                Content::Str(v) => Ok(visitor.visit_borrowed_str::<Self::Error>(v)?),
+                Content::ByteBuf(v) => Ok(visitor.visit_byte_buf::<Self::Error>(v)?),
+                Content::Bytes(v) => Ok(visitor.visit_borrowed_bytes::<Self::Error>(v)?),
                 _ => Err(self.invalid_type(&visitor)),
             }
         }
 
+        #[iex]
         fn deserialize_bytes<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: Visitor<'de>,
@@ -1275,38 +1386,43 @@ mod content {
             self.deserialize_byte_buf(visitor)
         }
 
+        #[iex]
         fn deserialize_byte_buf<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: Visitor<'de>,
         {
             match self.content {
-                Content::String(v) => visitor.visit_string(v),
-                Content::Str(v) => visitor.visit_borrowed_str(v),
-                Content::ByteBuf(v) => visitor.visit_byte_buf(v),
-                Content::Bytes(v) => visitor.visit_borrowed_bytes(v),
-                Content::Seq(v) => visit_content_seq(v, visitor),
+                Content::String(v) => Ok(visitor.visit_string::<Self::Error>(v)?),
+                Content::Str(v) => Ok(visitor.visit_borrowed_str::<Self::Error>(v)?),
+                Content::ByteBuf(v) => Ok(visitor.visit_byte_buf::<Self::Error>(v)?),
+                Content::Bytes(v) => Ok(visitor.visit_borrowed_bytes::<Self::Error>(v)?),
+                Content::Seq(v) => Ok(visit_content_seq::<_, Self::Error>(v, visitor)?),
                 _ => Err(self.invalid_type(&visitor)),
             }
         }
 
+        #[iex]
         fn deserialize_option<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: Visitor<'de>,
         {
             match self.content {
-                Content::None => visitor.visit_none(),
-                Content::Some(v) => visitor.visit_some(ContentDeserializer::new(*v)),
-                Content::Unit => visitor.visit_unit(),
-                _ => visitor.visit_some(self),
+                Content::None => Ok(visitor.visit_none::<Self::Error>()?),
+                Content::Some(v) => {
+                    Ok(visitor.visit_some(ContentDeserializer::<Self::Error>::new(*v))?)
+                }
+                Content::Unit => Ok(visitor.visit_unit::<Self::Error>()?),
+                _ => Ok(visitor.visit_some(self)?),
             }
         }
 
+        #[iex]
         fn deserialize_unit<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: Visitor<'de>,
         {
             match self.content {
-                Content::Unit => visitor.visit_unit(),
+                Content::Unit => Ok(visitor.visit_unit::<Self::Error>()?),
 
                 // Allow deserializing newtype variant containing unit.
                 //
@@ -1317,11 +1433,12 @@ mod content {
                 //     }
                 //
                 // We want {"result":"Success"} to deserialize into Response<()>.
-                Content::Map(ref v) if v.is_empty() => visitor.visit_unit(),
+                Content::Map(ref v) if v.is_empty() => Ok(visitor.visit_unit::<Self::Error>()?),
                 _ => Err(self.invalid_type(&visitor)),
             }
         }
 
+        #[iex]
         fn deserialize_unit_struct<V>(
             self,
             _name: &'static str,
@@ -1345,36 +1462,43 @@ mod content {
                 //
                 // We want {"topic":"Info"} to deserialize even though
                 // ordinarily unit structs do not deserialize from empty map/seq.
-                Content::Map(ref v) if v.is_empty() => visitor.visit_unit(),
-                Content::Seq(ref v) if v.is_empty() => visitor.visit_unit(),
-                _ => self.deserialize_any(visitor),
+                Content::Map(ref v) if v.is_empty() => Ok(visitor.visit_unit::<Self::Error>()?),
+                Content::Seq(ref v) if v.is_empty() => Ok(visitor.visit_unit::<Self::Error>()?),
+                _ => Ok(self.deserialize_any(visitor)?),
             }
         }
 
+        #[iex]
         fn deserialize_newtype_struct<V>(
             self,
-            _name: &str,
+            _name: &'static str,
             visitor: V,
         ) -> Result<V::Value, Self::Error>
         where
             V: Visitor<'de>,
         {
             match self.content {
-                Content::Newtype(v) => visitor.visit_newtype_struct(ContentDeserializer::new(*v)),
-                _ => visitor.visit_newtype_struct(self),
+                Content::Newtype(v) => Ok(visitor.visit_newtype_struct(ContentDeserializer::<
+                    Self::Error,
+                >::new(
+                    *v
+                ))?),
+                _ => Ok(visitor.visit_newtype_struct(self)?),
             }
         }
 
+        #[iex]
         fn deserialize_seq<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: Visitor<'de>,
         {
             match self.content {
-                Content::Seq(v) => visit_content_seq(v, visitor),
+                Content::Seq(v) => Ok(visit_content_seq::<_, Self::Error>(v, visitor)?),
                 _ => Err(self.invalid_type(&visitor)),
             }
         }
 
+        #[iex]
         fn deserialize_tuple<V>(self, _len: usize, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: Visitor<'de>,
@@ -1382,6 +1506,7 @@ mod content {
             self.deserialize_seq(visitor)
         }
 
+        #[iex]
         fn deserialize_tuple_struct<V>(
             self,
             _name: &'static str,
@@ -1394,16 +1519,18 @@ mod content {
             self.deserialize_seq(visitor)
         }
 
+        #[iex]
         fn deserialize_map<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: Visitor<'de>,
         {
             match self.content {
-                Content::Map(v) => visit_content_map(v, visitor),
+                Content::Map(v) => Ok(visit_content_map::<_, Self::Error>(v, visitor)?),
                 _ => Err(self.invalid_type(&visitor)),
             }
         }
 
+        #[iex]
         fn deserialize_struct<V>(
             self,
             _name: &'static str,
@@ -1414,15 +1541,16 @@ mod content {
             V: Visitor<'de>,
         {
             match self.content {
-                Content::Seq(v) => visit_content_seq(v, visitor),
-                Content::Map(v) => visit_content_map(v, visitor),
+                Content::Seq(v) => Ok(visit_content_seq::<_, Self::Error>(v, visitor)?),
+                Content::Map(v) => Ok(visit_content_map::<_, Self::Error>(v, visitor)?),
                 _ => Err(self.invalid_type(&visitor)),
             }
         }
 
+        #[iex]
         fn deserialize_enum<V>(
             self,
-            _name: &str,
+            _name: &'static str,
             _variants: &'static [&'static str],
             visitor: V,
         ) -> Result<V::Value, Self::Error>
@@ -1459,32 +1587,35 @@ mod content {
                 }
             };
 
-            visitor.visit_enum(EnumDeserializer::new(variant, value))
+            Ok(visitor.visit_enum(EnumDeserializer::<Self::Error>::new(variant, value))?)
         }
 
+        #[iex]
         fn deserialize_identifier<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: Visitor<'de>,
         {
             match self.content {
-                Content::String(v) => visitor.visit_string(v),
-                Content::Str(v) => visitor.visit_borrowed_str(v),
-                Content::ByteBuf(v) => visitor.visit_byte_buf(v),
-                Content::Bytes(v) => visitor.visit_borrowed_bytes(v),
-                Content::U8(v) => visitor.visit_u8(v),
-                Content::U64(v) => visitor.visit_u64(v),
+                Content::String(v) => Ok(visitor.visit_string::<Self::Error>(v)?),
+                Content::Str(v) => Ok(visitor.visit_borrowed_str::<Self::Error>(v)?),
+                Content::ByteBuf(v) => Ok(visitor.visit_byte_buf::<Self::Error>(v)?),
+                Content::Bytes(v) => Ok(visitor.visit_borrowed_bytes::<Self::Error>(v)?),
+                Content::U8(v) => Ok(visitor.visit_u8::<Self::Error>(v)?),
+                Content::U64(v) => Ok(visitor.visit_u64::<Self::Error>(v)?),
                 _ => Err(self.invalid_type(&visitor)),
             }
         }
 
+        #[iex]
         fn deserialize_ignored_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: Visitor<'de>,
         {
             drop(self);
-            visitor.visit_unit()
+            visitor.visit_unit::<Self::Error>()
         }
 
+        #[iex]
         fn __deserialize_content<V>(
             self,
             _: actually_private::T,
@@ -1537,6 +1668,7 @@ mod content {
         type Error = E;
         type Variant = VariantDeserializer<'de, Self::Error>;
 
+        #[iex]
         fn variant_seed<V>(self, seed: V) -> Result<(V::Value, Self::Variant), E>
         where
             V: de::DeserializeSeed<'de>,
@@ -1545,8 +1677,10 @@ mod content {
                 value: self.value,
                 err: PhantomData,
             };
-            seed.deserialize(ContentDeserializer::new(self.variant))
-                .map(|v| (v, visitor))
+            Ok((
+                seed.deserialize(ContentDeserializer::<E>::new(self.variant))?,
+                visitor,
+            ))
         }
     }
 
@@ -1564,19 +1698,21 @@ mod content {
     {
         type Error = E;
 
+        #[iex]
         fn unit_variant(self) -> Result<(), E> {
             match self.value {
-                Some(value) => de::Deserialize::deserialize(ContentDeserializer::new(value)),
+                Some(value) => Ok(<()>::deserialize(ContentDeserializer::<E>::new(value))?),
                 None => Ok(()),
             }
         }
 
+        #[iex]
         fn newtype_variant_seed<T>(self, seed: T) -> Result<T::Value, E>
         where
             T: de::DeserializeSeed<'de>,
         {
             match self.value {
-                Some(value) => seed.deserialize(ContentDeserializer::new(value)),
+                Some(value) => Ok(seed.deserialize(ContentDeserializer::<E>::new(value))?),
                 None => Err(de::Error::invalid_type(
                     de::Unexpected::UnitVariant,
                     &"newtype variant",
@@ -1584,14 +1720,16 @@ mod content {
             }
         }
 
+        #[iex]
         fn tuple_variant<V>(self, _len: usize, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: de::Visitor<'de>,
         {
             match self.value {
-                Some(Content::Seq(v)) => {
-                    de::Deserializer::deserialize_any(SeqDeserializer::new(v.into_iter()), visitor)
-                }
+                Some(Content::Seq(v)) => Ok(de::Deserializer::deserialize_any(
+                    SeqDeserializer::<_, Self::Error>::new(v.into_iter()),
+                    visitor,
+                )?),
                 Some(other) => Err(de::Error::invalid_type(
                     other.unexpected(),
                     &"tuple variant",
@@ -1603,6 +1741,7 @@ mod content {
             }
         }
 
+        #[iex]
         fn struct_variant<V>(
             self,
             _fields: &'static [&'static str],
@@ -1612,12 +1751,14 @@ mod content {
             V: de::Visitor<'de>,
         {
             match self.value {
-                Some(Content::Map(v)) => {
-                    de::Deserializer::deserialize_any(MapDeserializer::new(v.into_iter()), visitor)
-                }
-                Some(Content::Seq(v)) => {
-                    de::Deserializer::deserialize_any(SeqDeserializer::new(v.into_iter()), visitor)
-                }
+                Some(Content::Map(v)) => Ok(de::Deserializer::deserialize_any(
+                    MapDeserializer::<_, Self::Error>::new(v.into_iter()),
+                    visitor,
+                )?),
+                Some(Content::Seq(v)) => Ok(de::Deserializer::deserialize_any(
+                    SeqDeserializer::<_, Self::Error>::new(v.into_iter()),
+                    visitor,
+                )?),
                 Some(other) => Err(de::Error::invalid_type(
                     other.unexpected(),
                     &"struct variant",
@@ -1645,43 +1786,46 @@ mod content {
             de::Error::invalid_type(self.content.unexpected(), exp)
         }
 
+        #[iex(captures = "'a", captures = "'de")]
         fn deserialize_integer<V>(self, visitor: V) -> Result<V::Value, E>
         where
             V: Visitor<'de>,
         {
             match *self.content {
-                Content::U8(v) => visitor.visit_u8(v),
-                Content::U16(v) => visitor.visit_u16(v),
-                Content::U32(v) => visitor.visit_u32(v),
-                Content::U64(v) => visitor.visit_u64(v),
-                Content::I8(v) => visitor.visit_i8(v),
-                Content::I16(v) => visitor.visit_i16(v),
-                Content::I32(v) => visitor.visit_i32(v),
-                Content::I64(v) => visitor.visit_i64(v),
+                Content::U8(v) => Ok(visitor.visit_u8::<E>(v)?),
+                Content::U16(v) => Ok(visitor.visit_u16::<E>(v)?),
+                Content::U32(v) => Ok(visitor.visit_u32::<E>(v)?),
+                Content::U64(v) => Ok(visitor.visit_u64::<E>(v)?),
+                Content::I8(v) => Ok(visitor.visit_i8::<E>(v)?),
+                Content::I16(v) => Ok(visitor.visit_i16::<E>(v)?),
+                Content::I32(v) => Ok(visitor.visit_i32::<E>(v)?),
+                Content::I64(v) => Ok(visitor.visit_i64::<E>(v)?),
                 _ => Err(self.invalid_type(&visitor)),
             }
         }
 
+        #[iex(captures = "'a", captures = "'de")]
         fn deserialize_float<V>(self, visitor: V) -> Result<V::Value, E>
         where
             V: Visitor<'de>,
         {
             match *self.content {
-                Content::F32(v) => visitor.visit_f32(v),
-                Content::F64(v) => visitor.visit_f64(v),
-                Content::U8(v) => visitor.visit_u8(v),
-                Content::U16(v) => visitor.visit_u16(v),
-                Content::U32(v) => visitor.visit_u32(v),
-                Content::U64(v) => visitor.visit_u64(v),
-                Content::I8(v) => visitor.visit_i8(v),
-                Content::I16(v) => visitor.visit_i16(v),
-                Content::I32(v) => visitor.visit_i32(v),
-                Content::I64(v) => visitor.visit_i64(v),
+                Content::F32(v) => Ok(visitor.visit_f32::<E>(v)?),
+                Content::F64(v) => Ok(visitor.visit_f64::<E>(v)?),
+                Content::U8(v) => Ok(visitor.visit_u8::<E>(v)?),
+                Content::U16(v) => Ok(visitor.visit_u16::<E>(v)?),
+                Content::U32(v) => Ok(visitor.visit_u32::<E>(v)?),
+                Content::U64(v) => Ok(visitor.visit_u64::<E>(v)?),
+                Content::I8(v) => Ok(visitor.visit_i8::<E>(v)?),
+                Content::I16(v) => Ok(visitor.visit_i16::<E>(v)?),
+                Content::I32(v) => Ok(visitor.visit_i32::<E>(v)?),
+                Content::I64(v) => Ok(visitor.visit_i64::<E>(v)?),
                 _ => Err(self.invalid_type(&visitor)),
             }
         }
     }
 
+    #[iex]
     fn visit_content_seq_ref<'a, 'de, V, E>(
         content: &'a [Content<'de>],
         visitor: V,
@@ -1690,13 +1834,14 @@ mod content {
         V: Visitor<'de>,
         E: de::Error,
     {
-        let seq = content.iter().map(ContentRefDeserializer::new);
+        let seq = content.iter().map(ContentRefDeserializer::<E>::new);
         let mut seq_visitor = SeqDeserializer::new(seq);
-        let value = tri!(visitor.visit_seq(&mut seq_visitor));
-        tri!(seq_visitor.end());
+        let value = visitor.visit_seq(&mut seq_visitor)?;
+        seq_visitor.end()?;
         Ok(value)
     }
 
+    #[iex]
     fn visit_content_map_ref<'a, 'de, V, E>(
         content: &'a [(Content<'de>, Content<'de>)],
         visitor: V,
@@ -1707,13 +1852,13 @@ mod content {
     {
         let map = content.iter().map(|(k, v)| {
             (
-                ContentRefDeserializer::new(k),
+                ContentRefDeserializer::<E>::new(k),
                 ContentRefDeserializer::new(v),
             )
         });
         let mut map_visitor = MapDeserializer::new(map);
-        let value = tri!(visitor.visit_map(&mut map_visitor));
-        tri!(map_visitor.end());
+        let value = visitor.visit_map(&mut map_visitor)?;
+        map_visitor.end()?;
         Ok(value)
     }
 
@@ -1725,48 +1870,53 @@ mod content {
     {
         type Error = E;
 
+        #[iex]
         fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, E>
         where
             V: Visitor<'de>,
         {
             match *self.content {
-                Content::Bool(v) => visitor.visit_bool(v),
-                Content::U8(v) => visitor.visit_u8(v),
-                Content::U16(v) => visitor.visit_u16(v),
-                Content::U32(v) => visitor.visit_u32(v),
-                Content::U64(v) => visitor.visit_u64(v),
-                Content::I8(v) => visitor.visit_i8(v),
-                Content::I16(v) => visitor.visit_i16(v),
-                Content::I32(v) => visitor.visit_i32(v),
-                Content::I64(v) => visitor.visit_i64(v),
-                Content::F32(v) => visitor.visit_f32(v),
-                Content::F64(v) => visitor.visit_f64(v),
-                Content::Char(v) => visitor.visit_char(v),
-                Content::String(ref v) => visitor.visit_str(v),
-                Content::Str(v) => visitor.visit_borrowed_str(v),
-                Content::ByteBuf(ref v) => visitor.visit_bytes(v),
-                Content::Bytes(v) => visitor.visit_borrowed_bytes(v),
-                Content::Unit => visitor.visit_unit(),
-                Content::None => visitor.visit_none(),
-                Content::Some(ref v) => visitor.visit_some(ContentRefDeserializer::new(v)),
-                Content::Newtype(ref v) => {
-                    visitor.visit_newtype_struct(ContentRefDeserializer::new(v))
+                Content::Bool(v) => Ok(visitor.visit_bool::<E>(v)?),
+                Content::U8(v) => Ok(visitor.visit_u8::<E>(v)?),
+                Content::U16(v) => Ok(visitor.visit_u16::<E>(v)?),
+                Content::U32(v) => Ok(visitor.visit_u32::<E>(v)?),
+                Content::U64(v) => Ok(visitor.visit_u64::<E>(v)?),
+                Content::I8(v) => Ok(visitor.visit_i8::<E>(v)?),
+                Content::I16(v) => Ok(visitor.visit_i16::<E>(v)?),
+                Content::I32(v) => Ok(visitor.visit_i32::<E>(v)?),
+                Content::I64(v) => Ok(visitor.visit_i64::<E>(v)?),
+                Content::F32(v) => Ok(visitor.visit_f32::<E>(v)?),
+                Content::F64(v) => Ok(visitor.visit_f64::<E>(v)?),
+                Content::Char(v) => Ok(visitor.visit_char::<E>(v)?),
+                Content::String(ref v) => Ok(visitor.visit_str::<E>(v)?),
+                Content::Str(v) => Ok(visitor.visit_borrowed_str::<E>(v)?),
+                Content::ByteBuf(ref v) => Ok(visitor.visit_bytes::<E>(v)?),
+                Content::Bytes(v) => Ok(visitor.visit_borrowed_bytes::<E>(v)?),
+                Content::Unit => Ok(visitor.visit_unit::<E>()?),
+                Content::None => Ok(visitor.visit_none::<E>()?),
+                Content::Some(ref v) => {
+                    Ok(visitor.visit_some(ContentRefDeserializer::<E>::new(v))?)
                 }
-                Content::Seq(ref v) => visit_content_seq_ref(v, visitor),
-                Content::Map(ref v) => visit_content_map_ref(v, visitor),
+                Content::Newtype(ref v) => {
+                    Ok(visitor.visit_newtype_struct(ContentRefDeserializer::<E>::new(v))?)
+                }
+                Content::Seq(ref v) => Ok(visit_content_seq_ref::<_, E>(v, visitor)?),
+                Content::Map(ref v) => Ok(visit_content_map_ref::<_, E>(v, visitor)?),
             }
         }
 
+        #[iex]
         fn deserialize_bool<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: Visitor<'de>,
         {
             match *self.content {
-                Content::Bool(v) => visitor.visit_bool(v),
+                Content::Bool(v) => Ok(visitor.visit_bool::<Self::Error>(v)?),
                 _ => Err(self.invalid_type(&visitor)),
             }
         }
 
+        #[iex]
         fn deserialize_i8<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: Visitor<'de>,
@@ -1774,6 +1924,7 @@ mod content {
             self.deserialize_integer(visitor)
         }
 
+        #[iex]
         fn deserialize_i16<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: Visitor<'de>,
@@ -1781,6 +1932,7 @@ mod content {
             self.deserialize_integer(visitor)
         }
 
+        #[iex]
         fn deserialize_i32<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: Visitor<'de>,
@@ -1788,6 +1940,7 @@ mod content {
             self.deserialize_integer(visitor)
         }
 
+        #[iex]
         fn deserialize_i64<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: Visitor<'de>,
@@ -1795,6 +1948,7 @@ mod content {
             self.deserialize_integer(visitor)
         }
 
+        #[iex]
         fn deserialize_u8<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: Visitor<'de>,
@@ -1802,6 +1956,7 @@ mod content {
             self.deserialize_integer(visitor)
         }
 
+        #[iex]
         fn deserialize_u16<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: Visitor<'de>,
@@ -1809,6 +1964,7 @@ mod content {
             self.deserialize_integer(visitor)
         }
 
+        #[iex]
         fn deserialize_u32<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: Visitor<'de>,
@@ -1816,6 +1972,7 @@ mod content {
             self.deserialize_integer(visitor)
         }
 
+        #[iex]
         fn deserialize_u64<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: Visitor<'de>,
@@ -1823,6 +1980,7 @@ mod content {
             self.deserialize_integer(visitor)
         }
 
+        #[iex]
         fn deserialize_f32<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: Visitor<'de>,
@@ -1830,6 +1988,7 @@ mod content {
             self.deserialize_float(visitor)
         }
 
+        #[iex]
         fn deserialize_f64<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: Visitor<'de>,
@@ -1837,31 +1996,34 @@ mod content {
             self.deserialize_float(visitor)
         }
 
+        #[iex]
         fn deserialize_char<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: Visitor<'de>,
         {
             match *self.content {
-                Content::Char(v) => visitor.visit_char(v),
-                Content::String(ref v) => visitor.visit_str(v),
-                Content::Str(v) => visitor.visit_borrowed_str(v),
+                Content::Char(v) => Ok(visitor.visit_char::<Self::Error>(v)?),
+                Content::String(ref v) => Ok(visitor.visit_str::<Self::Error>(v)?),
+                Content::Str(v) => Ok(visitor.visit_borrowed_str::<Self::Error>(v)?),
                 _ => Err(self.invalid_type(&visitor)),
             }
         }
 
+        #[iex]
         fn deserialize_str<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: Visitor<'de>,
         {
             match *self.content {
-                Content::String(ref v) => visitor.visit_str(v),
-                Content::Str(v) => visitor.visit_borrowed_str(v),
-                Content::ByteBuf(ref v) => visitor.visit_bytes(v),
-                Content::Bytes(v) => visitor.visit_borrowed_bytes(v),
+                Content::String(ref v) => Ok(visitor.visit_str::<Self::Error>(v)?),
+                Content::Str(v) => Ok(visitor.visit_borrowed_str::<Self::Error>(v)?),
+                Content::ByteBuf(ref v) => Ok(visitor.visit_bytes::<Self::Error>(v)?),
+                Content::Bytes(v) => Ok(visitor.visit_borrowed_bytes::<Self::Error>(v)?),
                 _ => Err(self.invalid_type(&visitor)),
             }
         }
 
+        #[iex]
         fn deserialize_string<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: Visitor<'de>,
@@ -1869,20 +2031,22 @@ mod content {
             self.deserialize_str(visitor)
         }
 
+        #[iex]
         fn deserialize_bytes<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: Visitor<'de>,
         {
             match *self.content {
-                Content::String(ref v) => visitor.visit_str(v),
-                Content::Str(v) => visitor.visit_borrowed_str(v),
-                Content::ByteBuf(ref v) => visitor.visit_bytes(v),
-                Content::Bytes(v) => visitor.visit_borrowed_bytes(v),
-                Content::Seq(ref v) => visit_content_seq_ref(v, visitor),
+                Content::String(ref v) => Ok(visitor.visit_str::<Self::Error>(v)?),
+                Content::Str(v) => Ok(visitor.visit_borrowed_str::<Self::Error>(v)?),
+                Content::ByteBuf(ref v) => Ok(visitor.visit_bytes::<Self::Error>(v)?),
+                Content::Bytes(v) => Ok(visitor.visit_borrowed_bytes::<Self::Error>(v)?),
+                Content::Seq(ref v) => Ok(visit_content_seq_ref::<_, Self::Error>(v, visitor)?),
                 _ => Err(self.invalid_type(&visitor)),
             }
         }
 
+        #[iex]
         fn deserialize_byte_buf<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: Visitor<'de>,
@@ -1890,28 +2054,33 @@ mod content {
             self.deserialize_bytes(visitor)
         }
 
+        #[iex]
         fn deserialize_option<V>(self, visitor: V) -> Result<V::Value, E>
         where
             V: Visitor<'de>,
         {
             match *self.content {
-                Content::None => visitor.visit_none(),
-                Content::Some(ref v) => visitor.visit_some(ContentRefDeserializer::new(v)),
-                Content::Unit => visitor.visit_unit(),
-                _ => visitor.visit_some(self),
+                Content::None => Ok(visitor.visit_none::<E>()?),
+                Content::Some(ref v) => {
+                    Ok(visitor.visit_some(ContentRefDeserializer::<E>::new(v))?)
+                }
+                Content::Unit => Ok(visitor.visit_unit::<E>()?),
+                _ => Ok(visitor.visit_some(self)?),
             }
         }
 
+        #[iex]
         fn deserialize_unit<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: Visitor<'de>,
         {
             match *self.content {
-                Content::Unit => visitor.visit_unit(),
+                Content::Unit => Ok(visitor.visit_unit::<Self::Error>()?),
                 _ => Err(self.invalid_type(&visitor)),
             }
         }
 
+        #[iex]
         fn deserialize_unit_struct<V>(
             self,
             _name: &'static str,
@@ -1923,28 +2092,35 @@ mod content {
             self.deserialize_unit(visitor)
         }
 
-        fn deserialize_newtype_struct<V>(self, _name: &str, visitor: V) -> Result<V::Value, E>
+        #[iex]
+        fn deserialize_newtype_struct<V>(
+            self,
+            _name: &'static str,
+            visitor: V,
+        ) -> Result<V::Value, E>
         where
             V: Visitor<'de>,
         {
             match *self.content {
                 Content::Newtype(ref v) => {
-                    visitor.visit_newtype_struct(ContentRefDeserializer::new(v))
+                    Ok(visitor.visit_newtype_struct(ContentRefDeserializer::<E>::new(v))?)
                 }
-                _ => visitor.visit_newtype_struct(self),
+                _ => Ok(visitor.visit_newtype_struct(self)?),
             }
         }
 
+        #[iex]
         fn deserialize_seq<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: Visitor<'de>,
         {
             match *self.content {
-                Content::Seq(ref v) => visit_content_seq_ref(v, visitor),
+                Content::Seq(ref v) => Ok(visit_content_seq_ref::<_, Self::Error>(v, visitor)?),
                 _ => Err(self.invalid_type(&visitor)),
             }
         }
 
+        #[iex]
         fn deserialize_tuple<V>(self, _len: usize, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: Visitor<'de>,
@@ -1952,6 +2128,7 @@ mod content {
             self.deserialize_seq(visitor)
         }
 
+        #[iex]
         fn deserialize_tuple_struct<V>(
             self,
             _name: &'static str,
@@ -1964,16 +2141,18 @@ mod content {
             self.deserialize_seq(visitor)
         }
 
+        #[iex]
         fn deserialize_map<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: Visitor<'de>,
         {
             match *self.content {
-                Content::Map(ref v) => visit_content_map_ref(v, visitor),
+                Content::Map(ref v) => Ok(visit_content_map_ref::<_, Self::Error>(v, visitor)?),
                 _ => Err(self.invalid_type(&visitor)),
             }
         }
 
+        #[iex]
         fn deserialize_struct<V>(
             self,
             _name: &'static str,
@@ -1984,15 +2163,16 @@ mod content {
             V: Visitor<'de>,
         {
             match *self.content {
-                Content::Seq(ref v) => visit_content_seq_ref(v, visitor),
-                Content::Map(ref v) => visit_content_map_ref(v, visitor),
+                Content::Seq(ref v) => Ok(visit_content_seq_ref::<_, Self::Error>(v, visitor)?),
+                Content::Map(ref v) => Ok(visit_content_map_ref::<_, Self::Error>(v, visitor)?),
                 _ => Err(self.invalid_type(&visitor)),
             }
         }
 
+        #[iex]
         fn deserialize_enum<V>(
             self,
-            _name: &str,
+            _name: &'static str,
             _variants: &'static [&'static str],
             visitor: V,
         ) -> Result<V::Value, Self::Error>
@@ -2029,35 +2209,38 @@ mod content {
                 }
             };
 
-            visitor.visit_enum(EnumRefDeserializer {
+            Ok(visitor.visit_enum(EnumRefDeserializer {
                 variant,
                 value,
-                err: PhantomData,
-            })
+                err: PhantomData::<Self::Error>,
+            })?)
         }
 
+        #[iex]
         fn deserialize_identifier<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: Visitor<'de>,
         {
             match *self.content {
-                Content::String(ref v) => visitor.visit_str(v),
-                Content::Str(v) => visitor.visit_borrowed_str(v),
-                Content::ByteBuf(ref v) => visitor.visit_bytes(v),
-                Content::Bytes(v) => visitor.visit_borrowed_bytes(v),
-                Content::U8(v) => visitor.visit_u8(v),
-                Content::U64(v) => visitor.visit_u64(v),
+                Content::String(ref v) => Ok(visitor.visit_str::<Self::Error>(v)?),
+                Content::Str(v) => Ok(visitor.visit_borrowed_str::<Self::Error>(v)?),
+                Content::ByteBuf(ref v) => Ok(visitor.visit_bytes::<Self::Error>(v)?),
+                Content::Bytes(v) => Ok(visitor.visit_borrowed_bytes::<Self::Error>(v)?),
+                Content::U8(v) => Ok(visitor.visit_u8::<Self::Error>(v)?),
+                Content::U64(v) => Ok(visitor.visit_u64::<Self::Error>(v)?),
                 _ => Err(self.invalid_type(&visitor)),
             }
         }
 
+        #[iex]
         fn deserialize_ignored_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: Visitor<'de>,
         {
-            visitor.visit_unit()
+            visitor.visit_unit::<Self::Error>()
         }
 
+        #[iex]
         fn __deserialize_content<V>(
             self,
             _: actually_private::T,
@@ -2105,6 +2288,7 @@ mod content {
         type Error = E;
         type Variant = VariantRefDeserializer<'a, 'de, Self::Error>;
 
+        #[iex]
         fn variant_seed<V>(self, seed: V) -> Result<(V::Value, Self::Variant), Self::Error>
         where
             V: de::DeserializeSeed<'de>,
@@ -2113,8 +2297,10 @@ mod content {
                 value: self.value,
                 err: PhantomData,
             };
-            seed.deserialize(ContentRefDeserializer::new(self.variant))
-                .map(|v| (v, visitor))
+            Ok((
+                seed.deserialize(ContentRefDeserializer::<Self::Error>::new(self.variant))?,
+                visitor,
+            ))
         }
     }
 
@@ -2132,19 +2318,21 @@ mod content {
     {
         type Error = E;
 
+        #[iex]
         fn unit_variant(self) -> Result<(), E> {
             match self.value {
-                Some(value) => de::Deserialize::deserialize(ContentRefDeserializer::new(value)),
+                Some(value) => Ok(<()>::deserialize(ContentRefDeserializer::<E>::new(value))?),
                 None => Ok(()),
             }
         }
 
+        #[iex]
         fn newtype_variant_seed<T>(self, seed: T) -> Result<T::Value, E>
         where
             T: de::DeserializeSeed<'de>,
         {
             match self.value {
-                Some(value) => seed.deserialize(ContentRefDeserializer::new(value)),
+                Some(value) => Ok(seed.deserialize(ContentRefDeserializer::<E>::new(value))?),
                 None => Err(de::Error::invalid_type(
                     de::Unexpected::UnitVariant,
                     &"newtype variant",
@@ -2152,14 +2340,16 @@ mod content {
             }
         }
 
+        #[iex]
         fn tuple_variant<V>(self, _len: usize, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: de::Visitor<'de>,
         {
             match self.value {
-                Some(Content::Seq(v)) => {
-                    de::Deserializer::deserialize_any(SeqRefDeserializer::new(v), visitor)
-                }
+                Some(Content::Seq(v)) => Ok(de::Deserializer::deserialize_any(
+                    SeqRefDeserializer::<Self::Error>::new(v),
+                    visitor,
+                )?),
                 Some(other) => Err(de::Error::invalid_type(
                     other.unexpected(),
                     &"tuple variant",
@@ -2171,6 +2361,7 @@ mod content {
             }
         }
 
+        #[iex]
         fn struct_variant<V>(
             self,
             _fields: &'static [&'static str],
@@ -2180,12 +2371,14 @@ mod content {
             V: de::Visitor<'de>,
         {
             match self.value {
-                Some(Content::Map(v)) => {
-                    de::Deserializer::deserialize_any(MapRefDeserializer::new(v), visitor)
-                }
-                Some(Content::Seq(v)) => {
-                    de::Deserializer::deserialize_any(SeqRefDeserializer::new(v), visitor)
-                }
+                Some(Content::Map(v)) => Ok(de::Deserializer::deserialize_any(
+                    MapRefDeserializer::<Self::Error>::new(v),
+                    visitor,
+                )?),
+                Some(Content::Seq(v)) => Ok(de::Deserializer::deserialize_any(
+                    SeqRefDeserializer::<Self::Error>::new(v),
+                    visitor,
+                )?),
                 Some(other) => Err(de::Error::invalid_type(
                     other.unexpected(),
                     &"struct variant",
@@ -2225,15 +2418,16 @@ mod content {
         type Error = E;
 
         #[inline]
+        #[iex]
         fn deserialize_any<V>(mut self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: de::Visitor<'de>,
         {
             let len = self.iter.len();
             if len == 0 {
-                visitor.visit_unit()
+                Ok(visitor.visit_unit::<Self::Error>()?)
             } else {
-                let ret = tri!(visitor.visit_seq(&mut self));
+                let ret = visitor.visit_seq(&mut self)?;
                 let remaining = self.iter.len();
                 if remaining == 0 {
                     Ok(ret)
@@ -2256,14 +2450,17 @@ mod content {
     {
         type Error = E;
 
+        #[iex]
         fn next_element_seed<T>(&mut self, seed: T) -> Result<Option<T::Value>, Self::Error>
         where
             T: de::DeserializeSeed<'de>,
         {
             match self.iter.next() {
-                Some(value) => seed
-                    .deserialize(ContentRefDeserializer::new(value))
-                    .map(Some),
+                Some(value) => {
+                    Ok(Some(seed.deserialize(ContentRefDeserializer::<
+                        Self::Error,
+                    >::new(value))?))
+                }
                 None => Ok(None),
             }
         }
@@ -2301,6 +2498,7 @@ mod content {
     {
         type Error = E;
 
+        #[iex]
         fn next_key_seed<T>(&mut self, seed: T) -> Result<Option<T::Value>, Self::Error>
         where
             T: de::DeserializeSeed<'de>,
@@ -2308,18 +2506,23 @@ mod content {
             match self.iter.next() {
                 Some((key, value)) => {
                     self.value = Some(value);
-                    seed.deserialize(ContentRefDeserializer::new(key)).map(Some)
+                    Ok(Some(seed.deserialize(ContentRefDeserializer::<
+                        Self::Error,
+                    >::new(key))?))
                 }
                 None => Ok(None),
             }
         }
 
+        #[iex]
         fn next_value_seed<T>(&mut self, seed: T) -> Result<T::Value, Self::Error>
         where
             T: de::DeserializeSeed<'de>,
         {
             match self.value.take() {
-                Some(value) => seed.deserialize(ContentRefDeserializer::new(value)),
+                Some(value) => {
+                    Ok(seed.deserialize(ContentRefDeserializer::<Self::Error>::new(value))?)
+                }
                 None => Err(de::Error::custom("value is missing")),
             }
         }
@@ -2336,6 +2539,7 @@ mod content {
         type Error = E;
 
         #[inline]
+        #[iex]
         fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: de::Visitor<'de>,
@@ -2401,6 +2605,7 @@ mod content {
             )
         }
 
+        #[iex]
         fn visit_seq<S>(self, _: S) -> Result<(), S::Error>
         where
             S: SeqAccess<'de>,
@@ -2408,11 +2613,12 @@ mod content {
             Ok(())
         }
 
+        #[iex]
         fn visit_map<M>(self, mut access: M) -> Result<(), M::Error>
         where
             M: MapAccess<'de>,
         {
-            while tri!(access.next_entry::<IgnoredAny, IgnoredAny>()).is_some() {}
+            while access.next_entry::<IgnoredAny, IgnoredAny>()?.is_some() {}
             Ok(())
         }
     }
@@ -2446,6 +2652,7 @@ mod content {
             )
         }
 
+        #[iex]
         fn visit_unit<E>(self) -> Result<(), E>
         where
             E: de::Error,
@@ -2453,6 +2660,7 @@ mod content {
             Ok(())
         }
 
+        #[iex]
         fn visit_none<E>(self) -> Result<(), E>
         where
             E: de::Error,
@@ -2504,11 +2712,12 @@ where
 {
     type Error = E;
 
+    #[iex]
     fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
     {
-        visitor.visit_str(self.value)
+        visitor.visit_str::<Self::Error>(self.value)
     }
 
     forward_to_deserialize_any! {
@@ -2529,11 +2738,12 @@ where
 {
     type Error = E;
 
+    #[iex]
     fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
     {
-        visitor.visit_borrowed_str(self.value)
+        visitor.visit_borrowed_str::<Self::Error>(self.value)
     }
 
     forward_to_deserialize_any! {
@@ -2604,6 +2814,7 @@ impl<'a, 'de, E> FlatMapDeserializer<'a, 'de, E>
 where
     E: Error,
 {
+    #[iex]
     fn deserialize_other<V>() -> Result<V, E> {
         Err(Error::custom("can only flatten structs and maps"))
     }
@@ -2613,6 +2824,7 @@ where
 macro_rules! forward_to_deserialize_other {
     ($($func:ident ($($arg:ty),*))*) => {
         $(
+            #[iex]
             fn $func<V>(self, $(_: $arg,)* _visitor: V) -> Result<V::Value, Self::Error>
             where
                 V: Visitor<'de>,
@@ -2630,6 +2842,7 @@ where
 {
     type Error = E;
 
+    #[iex]
     fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
@@ -2637,6 +2850,7 @@ where
         self.deserialize_map(visitor)
     }
 
+    #[iex]
     fn deserialize_enum<V>(
         self,
         name: &'static str,
@@ -2648,7 +2862,9 @@ where
     {
         for entry in self.0 {
             if let Some((key, value)) = flat_map_take_entry(entry, variants) {
-                return visitor.visit_enum(EnumDeserializer::new(key, Some(value)));
+                return Ok(
+                    visitor.visit_enum(EnumDeserializer::<Self::Error>::new(key, Some(value)))?
+                );
             }
         }
 
@@ -2658,6 +2874,7 @@ where
         )))
     }
 
+    #[iex]
     fn deserialize_map<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
@@ -2665,10 +2882,11 @@ where
         visitor.visit_map(FlatMapAccess {
             iter: self.0.iter(),
             pending_content: None,
-            _marker: PhantomData,
+            _marker: PhantomData::<Self::Error>,
         })
     }
 
+    #[iex]
     fn deserialize_struct<V>(
         self,
         _: &'static str,
@@ -2682,39 +2900,47 @@ where
             iter: self.0.iter_mut(),
             pending_content: None,
             fields,
-            _marker: PhantomData,
+            _marker: PhantomData::<Self::Error>,
         })
     }
 
-    fn deserialize_newtype_struct<V>(self, _name: &str, visitor: V) -> Result<V::Value, Self::Error>
+    #[iex]
+    fn deserialize_newtype_struct<V>(
+        self,
+        _name: &'static str,
+        visitor: V,
+    ) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
     {
         visitor.visit_newtype_struct(self)
     }
 
+    #[iex]
     fn deserialize_option<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
     {
-        match visitor.__private_visit_untagged_option(self) {
+        match visitor.__private_visit_untagged_option(self).into_result() {
             Ok(value) => Ok(value),
-            Err(()) => Self::deserialize_other(),
+            Err(()) => Ok(Self::deserialize_other()?),
         }
     }
 
+    #[iex]
     fn deserialize_unit<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
     {
-        visitor.visit_unit()
+        visitor.visit_unit::<Self::Error>()
     }
 
+    #[iex]
     fn deserialize_ignored_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
     {
-        visitor.visit_unit()
+        visitor.visit_unit::<Self::Error>()
     }
 
     forward_to_deserialize_other! {
@@ -2756,6 +2982,7 @@ where
 {
     type Error = E;
 
+    #[iex]
     fn next_key_seed<T>(&mut self, seed: T) -> Result<Option<T::Value>, Self::Error>
     where
         T: DeserializeSeed<'de>,
@@ -2768,18 +2995,21 @@ where
                 // is going to be consumed. Borrowing here leaves the entry
                 // available for later flattened fields.
                 self.pending_content = Some(content);
-                return seed.deserialize(ContentRefDeserializer::new(key)).map(Some);
+                return Ok(Some(
+                    seed.deserialize(ContentRefDeserializer::<Self::Error>::new(key))?,
+                ));
             }
         }
         Ok(None)
     }
 
+    #[iex]
     fn next_value_seed<T>(&mut self, seed: T) -> Result<T::Value, Self::Error>
     where
         T: DeserializeSeed<'de>,
     {
         match self.pending_content.take() {
-            Some(value) => seed.deserialize(ContentRefDeserializer::new(value)),
+            Some(value) => Ok(seed.deserialize(ContentRefDeserializer::<Self::Error>::new(value))?),
             None => Err(Error::custom("value is missing")),
         }
     }
@@ -2800,6 +3030,7 @@ where
 {
     type Error = E;
 
+    #[iex]
     fn next_key_seed<T>(&mut self, seed: T) -> Result<Option<T::Value>, Self::Error>
     where
         T: DeserializeSeed<'de>,
@@ -2807,18 +3038,21 @@ where
         for entry in self.iter.by_ref() {
             if let Some((key, content)) = flat_map_take_entry(entry, self.fields) {
                 self.pending_content = Some(content);
-                return seed.deserialize(ContentDeserializer::new(key)).map(Some);
+                return Ok(Some(
+                    seed.deserialize(ContentDeserializer::<Self::Error>::new(key))?,
+                ));
             }
         }
         Ok(None)
     }
 
+    #[iex]
     fn next_value_seed<T>(&mut self, seed: T) -> Result<T::Value, Self::Error>
     where
         T: DeserializeSeed<'de>,
     {
         match self.pending_content.take() {
-            Some(value) => seed.deserialize(ContentDeserializer::new(value)),
+            Some(value) => Ok(seed.deserialize(ContentDeserializer::<Self::Error>::new(value))?),
             None => Err(Error::custom("value is missing")),
         }
     }
@@ -2867,12 +3101,13 @@ where
         write!(formatter, "variant of enum {}", self.enum_name)
     }
 
+    #[iex]
     fn visit_enum<A>(self, data: A) -> Result<Self::Value, A::Error>
     where
         A: EnumAccess<'de>,
     {
-        let (variant, variant_access) = tri!(data.variant());
-        tri!(variant_access.unit_variant());
+        let (variant, variant_access) = data.variant()?;
+        variant_access.unit_variant()?;
         Ok(variant)
     }
 }
@@ -2883,6 +3118,7 @@ where
 {
     type Value = F;
 
+    #[iex]
     fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
     where
         D: Deserializer<'de>,

@@ -27,6 +27,8 @@ use self::private::{First, Second};
 use crate::de::{self, size_hint, Deserializer, Expected, IntoDeserializer, SeqAccess, Visitor};
 use crate::ser;
 
+use iex::iex;
+
 ////////////////////////////////////////////////////////////////////////////////
 
 // For structs that contain a PhantomData. We do not want the trait
@@ -160,18 +162,20 @@ where
         map struct enum identifier ignored_any
     }
 
+    #[iex]
     fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: de::Visitor<'de>,
     {
-        visitor.visit_unit()
+        visitor.visit_unit::<Self::Error>()
     }
 
+    #[iex]
     fn deserialize_option<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: de::Visitor<'de>,
     {
-        visitor.visit_none()
+        visitor.visit_none::<Self::Error>()
     }
 }
 
@@ -211,6 +215,7 @@ where
 {
     type Error = E;
 
+    #[iex]
     fn deserialize_any<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
     where
         V: de::Visitor<'de>,
@@ -271,11 +276,12 @@ macro_rules! primitive_deserializer {
                 tuple tuple_struct map struct enum identifier ignored_any
             }
 
+            #[iex]
             fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
             where
                 V: de::Visitor<'de>,
             {
-                visitor.$method(self.value $($cast)*)
+                visitor.$method::<Self::Error>(self.value $($cast)*)
             }
         }
 
@@ -347,16 +353,18 @@ where
         tuple_struct map struct identifier ignored_any
     }
 
+    #[iex]
     fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: de::Visitor<'de>,
     {
-        visitor.visit_u32(self.value)
+        visitor.visit_u32::<Self::Error>(self.value)
     }
 
+    #[iex]
     fn deserialize_enum<V>(
         self,
-        name: &str,
+        name: &'static str,
         variants: &'static [&'static str],
         visitor: V,
     ) -> Result<V::Value, Self::Error>
@@ -376,11 +384,12 @@ where
     type Error = E;
     type Variant = private::UnitOnly<E>;
 
+    #[iex]
     fn variant_seed<T>(self, seed: T) -> Result<(T::Value, Self::Variant), Self::Error>
     where
         T: de::DeserializeSeed<'de>,
     {
-        seed.deserialize(self).map(private::unit_only)
+        Ok(private::unit_only(seed.deserialize(self)?))
     }
 }
 
@@ -430,16 +439,18 @@ where
 {
     type Error = E;
 
+    #[iex]
     fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: de::Visitor<'de>,
     {
-        visitor.visit_str(self.value)
+        visitor.visit_str::<Self::Error>(self.value)
     }
 
+    #[iex]
     fn deserialize_enum<V>(
         self,
-        name: &str,
+        name: &'static str,
         variants: &'static [&'static str],
         visitor: V,
     ) -> Result<V::Value, Self::Error>
@@ -465,11 +476,12 @@ where
     type Error = E;
     type Variant = private::UnitOnly<E>;
 
+    #[iex]
     fn variant_seed<T>(self, seed: T) -> Result<(T::Value, Self::Variant), Self::Error>
     where
         T: de::DeserializeSeed<'de>,
     {
-        seed.deserialize(self).map(private::unit_only)
+        Ok(private::unit_only(seed.deserialize(self)?))
     }
 }
 
@@ -509,16 +521,18 @@ where
 {
     type Error = E;
 
+    #[iex]
     fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: de::Visitor<'de>,
     {
-        visitor.visit_borrowed_str(self.value)
+        visitor.visit_borrowed_str::<Self::Error>(self.value)
     }
 
+    #[iex]
     fn deserialize_enum<V>(
         self,
-        name: &str,
+        name: &'static str,
         variants: &'static [&'static str],
         visitor: V,
     ) -> Result<V::Value, Self::Error>
@@ -544,11 +558,12 @@ where
     type Error = E;
     type Variant = private::UnitOnly<E>;
 
+    #[iex]
     fn variant_seed<T>(self, seed: T) -> Result<(T::Value, Self::Variant), Self::Error>
     where
         T: de::DeserializeSeed<'de>,
     {
-        seed.deserialize(self).map(private::unit_only)
+        Ok(private::unit_only(seed.deserialize(self)?))
     }
 }
 
@@ -612,16 +627,18 @@ where
 {
     type Error = E;
 
+    #[iex]
     fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: de::Visitor<'de>,
     {
-        visitor.visit_string(self.value)
+        visitor.visit_string::<Self::Error>(self.value)
     }
 
+    #[iex]
     fn deserialize_enum<V>(
         self,
-        name: &str,
+        name: &'static str,
         variants: &'static [&'static str],
         visitor: V,
     ) -> Result<V::Value, Self::Error>
@@ -648,11 +665,12 @@ where
     type Error = E;
     type Variant = private::UnitOnly<E>;
 
+    #[iex]
     fn variant_seed<T>(self, seed: T) -> Result<(T::Value, Self::Variant), Self::Error>
     where
         T: de::DeserializeSeed<'de>,
     {
-        seed.deserialize(self).map(private::unit_only)
+        Ok(private::unit_only(seed.deserialize(self)?))
     }
 }
 
@@ -717,19 +735,21 @@ where
 {
     type Error = E;
 
+    #[iex]
     fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: de::Visitor<'de>,
     {
         match self.value {
-            Cow::Borrowed(string) => visitor.visit_str(string),
-            Cow::Owned(string) => visitor.visit_string(string),
+            Cow::Borrowed(string) => Ok(visitor.visit_str::<Self::Error>(string)?),
+            Cow::Owned(string) => Ok(visitor.visit_string::<Self::Error>(string)?),
         }
     }
 
+    #[iex]
     fn deserialize_enum<V>(
         self,
-        name: &str,
+        name: &'static str,
         variants: &'static [&'static str],
         visitor: V,
     ) -> Result<V::Value, Self::Error>
@@ -756,11 +776,12 @@ where
     type Error = E;
     type Variant = private::UnitOnly<E>;
 
+    #[iex]
     fn variant_seed<T>(self, seed: T) -> Result<(T::Value, Self::Variant), Self::Error>
     where
         T: de::DeserializeSeed<'de>,
     {
-        seed.deserialize(self).map(private::unit_only)
+        Ok(private::unit_only(seed.deserialize(self)?))
     }
 }
 
@@ -811,11 +832,12 @@ where
 {
     type Error = E;
 
+    #[iex]
     fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
     {
-        visitor.visit_bytes(self.value)
+        visitor.visit_bytes::<Self::Error>(self.value)
     }
 
     forward_to_deserialize_any! {
@@ -859,11 +881,12 @@ where
 {
     type Error = E;
 
+    #[iex]
     fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
     {
-        visitor.visit_borrowed_bytes(self.value)
+        visitor.visit_borrowed_bytes::<Self::Error>(self.value)
     }
 
     forward_to_deserialize_any! {
@@ -913,6 +936,7 @@ where
 {
     /// Check for remaining elements after passing a `SeqDeserializer` to
     /// `Visitor::visit_seq`.
+    #[iex]
     pub fn end(self) -> Result<(), E> {
         let remaining = self.iter.count();
         if remaining == 0 {
@@ -936,12 +960,13 @@ where
 {
     type Error = E;
 
+    #[iex]
     fn deserialize_any<V>(mut self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: de::Visitor<'de>,
     {
-        let v = tri!(visitor.visit_seq(&mut self));
-        tri!(self.end());
+        let v = visitor.visit_seq(&mut self)?;
+        self.end()?;
         Ok(v)
     }
 
@@ -960,6 +985,7 @@ where
 {
     type Error = E;
 
+    #[iex]
     fn next_element_seed<V>(&mut self, seed: V) -> Result<Option<V::Value>, Self::Error>
     where
         V: de::DeserializeSeed<'de>,
@@ -967,7 +993,7 @@ where
         match self.iter.next() {
             Some(value) => {
                 self.count += 1;
-                seed.deserialize(value.into_deserializer()).map(Some)
+                Ok(Some(seed.deserialize(value.into_deserializer())?))
             }
             None => Ok(None),
         }
@@ -1069,6 +1095,7 @@ where
 {
     type Error = A::Error;
 
+    #[iex]
     fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: de::Visitor<'de>,
@@ -1123,6 +1150,7 @@ where
 {
     /// Check for remaining elements after passing a `MapDeserializer` to
     /// `Visitor::visit_map`.
+    #[iex(captures = "'de")]
     pub fn end(self) -> Result<(), E> {
         let remaining = self.iter.count();
         if remaining == 0 {
@@ -1164,24 +1192,27 @@ where
 {
     type Error = E;
 
+    #[iex]
     fn deserialize_any<V>(mut self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: de::Visitor<'de>,
     {
-        let value = tri!(visitor.visit_map(&mut self));
-        tri!(self.end());
+        let value = visitor.visit_map(&mut self)?;
+        self.end()?;
         Ok(value)
     }
 
+    #[iex]
     fn deserialize_seq<V>(mut self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: de::Visitor<'de>,
     {
-        let value = tri!(visitor.visit_seq(&mut self));
-        tri!(self.end());
+        let value = visitor.visit_seq(&mut self)?;
+        self.end()?;
         Ok(value)
     }
 
+    #[iex]
     fn deserialize_tuple<V>(self, len: usize, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: de::Visitor<'de>,
@@ -1207,6 +1238,7 @@ where
 {
     type Error = E;
 
+    #[iex]
     fn next_key_seed<T>(&mut self, seed: T) -> Result<Option<T::Value>, Self::Error>
     where
         T: de::DeserializeSeed<'de>,
@@ -1214,12 +1246,13 @@ where
         match self.next_pair() {
             Some((key, value)) => {
                 self.value = Some(value);
-                seed.deserialize(key.into_deserializer()).map(Some)
+                Ok(Some(seed.deserialize(key.into_deserializer())?))
             }
             None => Ok(None),
         }
     }
 
+    #[iex]
     fn next_value_seed<T>(&mut self, seed: T) -> Result<T::Value, Self::Error>
     where
         T: de::DeserializeSeed<'de>,
@@ -1231,6 +1264,7 @@ where
         seed.deserialize(value.into_deserializer())
     }
 
+    #[iex]
     fn next_entry_seed<TK, TV>(
         &mut self,
         kseed: TK,
@@ -1242,8 +1276,8 @@ where
     {
         match self.next_pair() {
             Some((key, value)) => {
-                let key = tri!(kseed.deserialize(key.into_deserializer()));
-                let value = tri!(vseed.deserialize(value.into_deserializer()));
+                let key = kseed.deserialize(key.into_deserializer())?;
+                let value = vseed.deserialize(value.into_deserializer())?;
                 Ok(Some((key, value)))
             }
             None => Ok(None),
@@ -1265,6 +1299,7 @@ where
 {
     type Error = E;
 
+    #[iex]
     fn next_element_seed<T>(&mut self, seed: T) -> Result<Option<T::Value>, Self::Error>
     where
         T: de::DeserializeSeed<'de>,
@@ -1272,7 +1307,7 @@ where
         match self.next_pair() {
             Some((k, v)) => {
                 let de = PairDeserializer(k, v, PhantomData);
-                seed.deserialize(de).map(Some)
+                Ok(Some(seed.deserialize(de)?))
             }
             None => Ok(None),
         }
@@ -1335,6 +1370,7 @@ where
         struct enum identifier ignored_any
     }
 
+    #[iex]
     fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: de::Visitor<'de>,
@@ -1342,12 +1378,13 @@ where
         self.deserialize_seq(visitor)
     }
 
+    #[iex]
     fn deserialize_seq<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: de::Visitor<'de>,
     {
         let mut pair_visitor = PairVisitor(Some(self.0), Some(self.1), PhantomData);
-        let pair = tri!(visitor.visit_seq(&mut pair_visitor));
+        let pair = visitor.visit_seq(&mut pair_visitor)?;
         if pair_visitor.1.is_none() {
             Ok(pair)
         } else {
@@ -1358,12 +1395,13 @@ where
         }
     }
 
+    #[iex]
     fn deserialize_tuple<V>(self, len: usize, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: de::Visitor<'de>,
     {
         if len == 2 {
-            self.deserialize_seq(visitor)
+            Ok(self.deserialize_seq(visitor)?)
         } else {
             // First argument is the number of elements in the data, second
             // argument is the number of elements expected by the Deserialize.
@@ -1382,14 +1420,15 @@ where
 {
     type Error = E;
 
+    #[iex]
     fn next_element_seed<T>(&mut self, seed: T) -> Result<Option<T::Value>, Self::Error>
     where
         T: de::DeserializeSeed<'de>,
     {
         if let Some(k) = self.0.take() {
-            seed.deserialize(k.into_deserializer()).map(Some)
+            Ok(Some(seed.deserialize(k.into_deserializer())?))
         } else if let Some(v) = self.1.take() {
-            seed.deserialize(v.into_deserializer()).map(Some)
+            Ok(Some(seed.deserialize(v.into_deserializer())?))
         } else {
             Ok(None)
         }
@@ -1472,6 +1511,7 @@ where
 {
     type Error = A::Error;
 
+    #[iex]
     fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: de::Visitor<'de>,
@@ -1479,9 +1519,10 @@ where
         visitor.visit_map(self.map)
     }
 
+    #[iex]
     fn deserialize_enum<V>(
         self,
-        _name: &str,
+        _name: &'static str,
         _variants: &'static [&'static str],
         visitor: V,
     ) -> Result<V::Value, Self::Error>
@@ -1505,11 +1546,12 @@ where
     type Error = A::Error;
     type Variant = private::MapAsEnum<A>;
 
+    #[iex]
     fn variant_seed<T>(mut self, seed: T) -> Result<(T::Value, Self::Variant), Self::Error>
     where
         T: de::DeserializeSeed<'de>,
     {
-        match tri!(self.map.next_key_seed(seed)) {
+        match self.map.next_key_seed(seed)? {
             Some(key) => Ok((key, private::map_as_enum(self.map))),
             None => Err(de::Error::invalid_type(de::Unexpected::Map, &"enum")),
         }
@@ -1537,6 +1579,7 @@ where
 {
     type Error = A::Error;
 
+    #[iex]
     fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: de::Visitor<'de>,
@@ -1554,6 +1597,8 @@ where
 ////////////////////////////////////////////////////////////////////////////////
 
 mod private {
+    use iex::iex;
+
     use crate::lib::*;
 
     use crate::de::{
@@ -1579,10 +1624,12 @@ mod private {
     {
         type Error = E;
 
+        #[iex]
         fn unit_variant(self) -> Result<(), Self::Error> {
             Ok(())
         }
 
+        #[iex]
         fn newtype_variant_seed<T>(self, _seed: T) -> Result<T::Value, Self::Error>
         where
             T: de::DeserializeSeed<'de>,
@@ -1593,6 +1640,7 @@ mod private {
             ))
         }
 
+        #[iex]
         fn tuple_variant<V>(self, _len: usize, _visitor: V) -> Result<V::Value, Self::Error>
         where
             V: de::Visitor<'de>,
@@ -1603,6 +1651,7 @@ mod private {
             ))
         }
 
+        #[iex]
         fn struct_variant<V>(
             self,
             _fields: &'static [&'static str],
@@ -1632,24 +1681,30 @@ mod private {
     {
         type Error = A::Error;
 
+        #[iex]
         fn unit_variant(mut self) -> Result<(), Self::Error> {
-            self.map.next_value()
+            Ok(self.map.next_value()?)
         }
 
+        #[iex]
         fn newtype_variant_seed<T>(mut self, seed: T) -> Result<T::Value, Self::Error>
         where
             T: DeserializeSeed<'de>,
         {
-            self.map.next_value_seed(seed)
+            Ok(self.map.next_value_seed(seed)?)
         }
 
+        #[iex]
         fn tuple_variant<V>(mut self, len: usize, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: Visitor<'de>,
         {
-            self.map.next_value_seed(SeedTupleVariant { len, visitor })
+            Ok(self
+                .map
+                .next_value_seed(SeedTupleVariant { len, visitor })?)
         }
 
+        #[iex]
         fn struct_variant<V>(
             mut self,
             _fields: &'static [&'static str],
@@ -1658,7 +1713,7 @@ mod private {
         where
             V: Visitor<'de>,
         {
-            self.map.next_value_seed(SeedStructVariant { visitor })
+            Ok(self.map.next_value_seed(SeedStructVariant { visitor })?)
         }
     }
 
@@ -1673,6 +1728,7 @@ mod private {
     {
         type Value = V::Value;
 
+        #[iex]
         fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
         where
             D: Deserializer<'de>,
@@ -1691,6 +1747,7 @@ mod private {
     {
         type Value = V::Value;
 
+        #[iex]
         fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
         where
             D: Deserializer<'de>,
